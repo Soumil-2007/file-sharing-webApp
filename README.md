@@ -1,201 +1,197 @@
-# **File Sharing Web App**
+# File Sharing Web App
 
-A full-stack web application for uploading, managing, and sharing files.
-The application allows users to securely upload files, view their own files, and download them.
-The backend is written in Go (Gin framework) with a MySQL database, while files are stored locally on disk.
-Phase B integrates user authentication and ownership-based access control, ensuring that each user can manage only their own files.
+A secure file-sharing web application built in Go, allowing users to upload, manage, and share files with JWT-based authentication and ownership enforcement. Files are stored locally on disk, with metadata in MySQL. Includes background cleanup for expired files and in-memory caching for performance.
 
-## **Features**
+## Features
 
-* Upload images, PDFs, and text files.
-* List and download uploaded files.
-* User authentication using JWT.
-* File ownership enforcement (users can only access their own files).
-* Stores file metadata in MySQL (filesharing database).
-* Files stored on local disk (./uploads) for efficient retrieval.
-* RESTful APIs for integration with frontend or other services.
+- **User Authentication**: Register/login with email and password; JWT tokens for secure access.
+- **File Operations**: Upload (images, PDFs, text), list, and download files; users can only access their own files.
+- **Concurrency**: Goroutines for file processing and background tasks.
+- **Caching**: In-memory caching for file metadata to reduce DB load.
+- **Background Jobs**: Periodic cleanup of expired files using goroutines.
+- **RESTful APIs**: Clean endpoints for integration.
 
-## **Database Schema**
+## Tech Stack
 
-**Database:** filesharing
+- **Backend**: Go (Golang)
+- **Framework**: Gorilla Mux for routing
+- **Database**: MySQL
+- **Authentication**: JWT (JSON Web Tokens)
+- **Caching**: In-memory (map-based)
+- **Other**: bcrypt for password hashing, UUID for file naming
 
-### **Files Table**
+## Installation & Setup
 
+### Prerequisites
+- Go 1.25.1 or higher
+- MySQL server
+- Git
+
+### Steps
+1. **Clone the Repository**:
+   ```
+   git clone https://github.com/Soumil-2007/file-sharing-webApp.git
+   cd file-sharing-webApp
+   ```
+
+2. **Install Dependencies**:
+   ```
+   go mod tidy
+   ```
+
+3. **Setup MySQL Database**:
+   - Start MySQL and create the database:
+     ```
+     mysql -u root -p
+     CREATE DATABASE filesharing;
+     CREATE USER 'web-user'@'localhost' IDENTIFIED BY 'password';
+     GRANT ALL PRIVILEGES ON filesharing.* TO 'web-user'@'localhost';
+     FLUSH PRIVILEGES;
+     EXIT;
+     ```
+   - Run migrations:
+     ```
+     go run cmd/migrate/migrations/main.go up
+     ```
+
+4. **Create Uploads Directory**:
+   ```
+   mkdir -p ./uploads
+   ```
+
+5. **Configure Environment Variables**:
+   Create a `.env` file in the root:
+   ```
+   DB_USER=web-user
+   DB_PASSWORD=password
+   DB_HOST=127.0.0.1
+   DB_PORT=3306
+   DB_NAME=filesharing
+   JWT_SECRET=your_strong_secret_here
+   ```
+
+6. **Run the Application**:
+   ```
+   go run cmd/main.go
+   ```
+   Server starts on `http://localhost:8080`.
+
+## Database Schema
+
+### Users Table
 ```sql
-CREATE TABLE IF NOT EXISTS files (
-  id INT AUTO_INCREMENT PRIMARY KEY,
-  owner_id INT NULL,
+CREATE TABLE users (
+  id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  firstName VARCHAR(255) NOT NULL,
+  lastName VARCHAR(255) NOT NULL,
+  email VARCHAR(255) NOT NULL UNIQUE,
+  password VARCHAR(255) NOT NULL,
+  createdAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id)
+);
+```
+
+### Files Table
+```sql
+CREATE TABLE files (
+  id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  owner_id INT,
   original_name VARCHAR(255) NOT NULL,
   stored_name VARCHAR(255) NOT NULL,
   mime_type VARCHAR(100),
   size_bytes BIGINT,
   path VARCHAR(1024),
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  FOREIGN KEY (owner_id) REFERENCES users(id) ON DELETE SET NULL,
   INDEX (owner_id)
 );
 ```
 
-### **Users Table (Phase B)**
+## API Endpoints
 
-```sql
-CREATE TABLE IF NOT EXISTS users (
-  id INT AUTO_INCREMENT PRIMARY KEY,
-  username VARCHAR(100) UNIQUE NOT NULL,
-  email VARCHAR(255),
-  password_hash VARCHAR(255) NOT NULL,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
+Base URL: `http://localhost:8080/api/v1`
 
-ALTER TABLE files
-ADD CONSTRAINT fk_files_owner
-FOREIGN KEY (owner_id)
-REFERENCES users(id) ON DELETE SET NULL;
-```
+### Public Endpoints
+- **POST /register**: Register a user.
+  - Body: `{"firstName": "John", "lastName": "Doe", "email": "john@example.com", "password": "password123"}`
+  - Response: 201 Created
+- **POST /login**: Login and get JWT.
+  - Body: `{"email": "john@example.com", "password": "password123"}`
+  - Response: `{"token": "<jwt_token>"}`
 
-## **Environment Variables**
+### Authenticated Endpoints (Require `Authorization: Bearer <token>`)
+- **POST /files**: Upload a file.
+  - Body: Form-data with `file` (e.g., image.pdf)
+  - Response: File metadata JSON
+- **GET /files**: List user's files (cached).
+  - Response: Array of file objects
+- **GET /files/{id}**: Download a file.
+  - Response: File binary
 
-Create a .env file in the root directory or export the following environment variables:
+## Usage Examples
 
-```
-DB_USER=root
-DB_PASS=yourpassword
-DB_HOST=127.0.0.1
-DB_PORT=3306
-DB_NAME=filesharing
-JWT_SECRET=your_jwt_secret
-```
+### With cURL
+- **Register**:
+  ```
+  curl -X POST http://localhost:8080/api/v1/register -H "Content-Type: application/json" -d '{"firstName":"John","lastName":"Doe","email":"john@example.com","password":"password123"}'
+  ```
+- **Login**:
+  ```
+  curl -X POST http://localhost:8080/api/v1/login -H "Content-Type: application/json" -d '{"email":"john@example.com","password":"password123"}'
+  ```
+- **Upload File** (replace `<token>`):
+  ```
+  curl -X POST http://localhost:8080/api/v1/files -H "Authorization: Bearer <token>" -F "file=@/path/to/file.pdf"
+  ```
+- **List Files**:
+  ```
+  curl -H "Authorization: Bearer <token>" http://localhost:8080/api/v1/files
+  ```
 
-## **Installation & Setup**
+### With Postman
+1. Set method to POST, URL to `http://localhost:8080/api/v1/register`, body as raw JSON.
+2. For login, get token from response.
+3. For protected routes, add header `Authorization: Bearer <token>`.
 
-1. **Clone the repository:**
-   ```
-   git clone [https://github.com/Soumil-2007/file-sharing-webApp.git](https://github.com/Soumil-2007/file-sharing-webApp.git)
-   cd file-sharing-webApp
-   ```
-
-2. **Install Go dependencies:**
-   ```
-   go mod tidy
-   ```
-
-3. Setup MySQL Database:
-   Ensure your MySQL server is running.
-   ```
-   # Connect to MySQL
-   mysql -u root -p
-
-   # Inside MySQL shell
-   CREATE DATABASE filesharing;
-   USE filesharing;
-
-   # Run migration files
-   source db/migrations/001_create_files_table.sql;
-   source db/migrations/002_create_users_table.sql;
-   ```
-
-4. **Create uploads directory:**
-   ```
-   mkdir -p ./uploads
-   ```
-
-5. Set environment variables:
-   Create a .env file as shown above, or run this command:
-   ```
-   export DB_USER=root
-   export DB_PASS=yourpassword
-   export DB_HOST=127.0.0.1
-   export DB_PORT=3306
-   export DB_NAME=filesharing
-   export JWT_SECRET=your_jwt_secret
-   ```
-
-6. **Run the application:**
-   ```
-   go run ./cmd
-   ```
-
-## **REST API Endpoints**
-
-### **Public APIs (Phase A)**
-
-| Method | Endpoint | Description |
-| :---- | :---- | :---- |
-| POST | /api/files | Upload a file |
-| GET | /api/files | List all files |
-| GET | /api/files/:id | Download a file by ID |
-
-### **Authenticated APIs (Phase B)**
-
-All routes require an Authorization: Bearer <JWT> header.
-
-| Method | Endpoint | Description |
-| :---- | :---- | :---- |
-| POST | /api/users/register | Register a new user |
-| POST | /api/users/login | Login and get JWT token |
-| POST | /api/files | Upload a file (owner_id set automatically) |
-| GET | /api/files | List current user's files only |
-| GET | /api/files/:id | Download only if owner |
-| DELETE | /api/files/:id | Delete only if owner |
-
-## **File Handling Notes**
-
-* Uploaded files are stored in ./uploads.
-* Each file is saved with a UUID prefix to prevent collisions.
-* File metadata (original name, stored name, MIME type, size, path) is stored in MySQL.
-* Access is restricted based on owner_id.
-
-## **Authentication Flow**
-
-1. User registers using /api/users/register.
-2. User logs in via /api/users/login and receives a JWT token.
-3. Include the token in the Authorization header for all protected endpoints.
-4. Middleware verifies the JWT and extracts the user_id for ownership enforcement.
-
-## **Folder Structure**
+## Folder Structure
 
 ```
 file-sharing-webApp/
-├── cmd/         # main.go, router registration
-├── configs/     # configuration files
-├── db/          # migration SQL files
+├── cmd/
+│   ├── main.go              # Entry point with background cleanup
+│   ├── api/api.go           # Router setup
+│   └── migrate/migrations/  # DB migrations
+├── configs/envs.go          # Environment config
+├── db/db.go                 # DB connection
 ├── services/
-│   ├── db/      # DB initialization
-│   └── files/   # file handlers (upload, list, download, delete)
-├── uploads/     # stored uploaded files
-├── go.mod
+│   ├── auth/                # JWT and password handling
+│   ├── files/files.go       # File upload/list/download with caching
+│   ├── middleware/auth.go   # JWT middleware
+│   └── user/                # User routes and store
+├── types/types.go           # Structs and interfaces
+├── utils/utils.go           # Helpers
+├── uploads/                 # Stored files
+├── .env                     # Environment vars
+├── go.mod                   # Dependencies
 └── README.md
 ```
 
-## **Testing APIs**
+## Background Jobs & Caching
 
-### **Upload a file (authenticated)**
+- **Cleanup**: Goroutine runs hourly to delete expired files from disk and DB.
+- **Caching**: In-memory map caches file lists for 5 minutes to avoid repeated DB queries.
 
-```
-curl -H "Authorization: Bearer <JWT>" -F "file=@/path/to/file.pdf" http://localhost:8080/api/files
-```
+## Future Enhancements
 
-### **List files**
+- Add search by name/type/date.
+- Implement file sharing with expiration.
+- Integrate Redis for distributed caching.
+- Add file versioning and quotas.
+- Build a frontend (React/Vue).
 
-```
-curl -H "Authorization: Bearer <JWT>" http://localhost:8080/api/files
-```
+For issues, check server logs or DB connections.
 
-### **Download a file**
+---
 
-```
-curl -H "Authorization: Bearer <JWT>" http://localhost:8080/api/files/5 -o downloaded.pdf
-```
-
-### **Delete a file**
-
-```
-curl -X DELETE -H "Authorization: Bearer <JWT>" http://localhost:8080/api/files/5
-```
-
-## **Future Enhancements**
-
-* Implement file versioning.
-* Add pagination and search for large file lists.
-* Store files on cloud storage (S3) instead of local disk.
-* Rate limiting and file quotas per user.
-* Frontend integration with React or Vue.js.
+This README is accurate to the current project state. If you need modifications, let me know!

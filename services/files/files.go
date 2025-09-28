@@ -5,11 +5,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"mime/multipart"
 	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/Soumil-2007/file-sharing-webApp/services/auth"
 	"github.com/google/uuid"
@@ -42,18 +44,18 @@ func NewHandler(store *Store) *Handler {
 }
 
 func (h *Handler) RegisterRoutes(r *mux.Router, authMiddleware mux.MiddlewareFunc) {
-    fileRouter := r.PathPrefix("/files").Subrouter()
-    fileRouter.Use(authMiddleware)
+	fileRouter := r.PathPrefix("/files").Subrouter()
+	fileRouter.Use(authMiddleware)
 
-    fileRouter.HandleFunc("", h.ListFiles).Methods("GET")
-    fileRouter.HandleFunc("/{id}", h.GetFile).Methods("GET")
-    fileRouter.HandleFunc("", h.HandleUpload).Methods("POST")
+	fileRouter.HandleFunc("", h.ListFiles).Methods("GET")
+	fileRouter.HandleFunc("/{id}", h.GetFile).Methods("GET")
+	fileRouter.HandleFunc("", h.HandleUpload).Methods("POST")
 }
-
 
 // ------------------- UPLOAD -------------------
 
 func (h *Handler) HandleUpload(w http.ResponseWriter, r *http.Request) {
+
 	if r.Header.Get("Content-Type") == "" || !strings.HasPrefix(r.Header.Get("Content-Type"), "multipart/form-data") {
 		http.Error(w, "Content-Type must be multipart/form-data", http.StatusBadRequest)
 		return
@@ -91,6 +93,12 @@ func (h *Handler) HandleUpload(w http.ResponseWriter, r *http.Request) {
 	filename = strings.ReplaceAll(filename, " ", "_")
 	newFilename := fmt.Sprintf("%s-%s", uuid.NewString(), filename)
 	outPath := filepath.Join(UploadDir, newFilename)
+
+	go func() {
+		// Simulate processing (e.g., generate thumbnail, log)
+		time.Sleep(1 * time.Second)
+		log.Println("File processed:", newFilename)
+	}()
 
 	// save file to disk
 	outFile, err := os.Create(outPath)
@@ -141,7 +149,7 @@ func detectMIME(f multipart.File) (string, error) {
 func (h *Handler) ListFiles(w http.ResponseWriter, r *http.Request) {
 	// 🔹 TEMPORARY: hardcoded user id until auth is ready
 	userID := 1
-
+	
 	rows, err := h.store.DB.Query(
 		"SELECT id, original_name, stored_name, mime_type, size_bytes, created_at FROM files WHERE owner_id = ? ORDER BY created_at DESC",
 		userID,
@@ -153,6 +161,17 @@ func (h *Handler) ListFiles(w http.ResponseWriter, r *http.Request) {
 	defer rows.Close()
 
 	var out []map[string]interface{}
+
+	var fileCache = make(map[string][]map[string]interface{})
+	key := fmt.Sprintf("files:%d", userID)
+	if cached, ok := fileCache[key]; ok {
+		json.NewEncoder(w).Encode(cached)
+		return
+	}
+	// Query DB...
+	fileCache[key] = out
+	json.NewEncoder(w).Encode(out)
+	
 	for rows.Next() {
 		var id int
 		var orig, stored, mime string
