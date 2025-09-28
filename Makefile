@@ -1,6 +1,3 @@
-build:
-	@go build -o bin/ecom cmd/main.go
-
 test:
 	@go test -v ./...
 	
@@ -15,3 +12,5 @@ migrate-up:
 
 migrate-down:
 	@go run cmd/migrate/main.go down
+build:
+	@go build -o bin/filesharing cmd/main.go

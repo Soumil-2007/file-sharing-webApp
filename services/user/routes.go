@@ -84,18 +84,19 @@ func (h *Handler) handleRegister(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// hash password
-	hashedPassword, err := auth.HashPassword(user.Password)
-	if err != nil {
-		utils.WriteError(w, http.StatusInternalServerError, err)
-		return
-	}
+hashedPassword, err := auth.HashPassword(user.Password)
+if err != nil {
+    utils.WriteError(w, http.StatusInternalServerError, err)
+    return
+}
 
-	err = h.store.CreateUser(types.User{
-		FirstName: user.FirstName,
-		LastName:  user.LastName,
-		Email:     user.Email,
-		Password:  hashedPassword,
-	})
+err = h.store.CreateUser(types.User{
+    FirstName: user.FirstName,
+    LastName:  user.LastName,
+    Email:     user.Email,
+    Password:  hashedPassword,
+})
+
 	if err != nil {
 		utils.WriteError(w, http.StatusInternalServerError, err)
 		return

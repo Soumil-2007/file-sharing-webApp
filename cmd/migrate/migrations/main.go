@@ -14,6 +14,10 @@ import (
 )
 
 func main() {
+	if len(os.Args) < 2 {
+	log.Fatal("Usage: go run main.go <up|down>")
+}
+
 	cfg := mysqlDriver.Config{
 		User:                 configs.Envs.DBUser,
 		Passwd:               configs.Envs.DBPassword,

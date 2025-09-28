@@ -29,13 +29,12 @@ func (s *APIServer) Run() error {
 
 	// Users
 	userStore := user.NewStore(s.db)
-	userHandler := user.NewHandler(userStore)
-	userHandler.RegisterRoutes(apiRouter)
+userHandler := user.NewHandler(userStore)
+userHandler.RegisterRoutes(apiRouter)
 
-	// Files (protected with JWT middleware)
-	fileStore := files.NewStore(s.db)
-	fileHandler := files.NewHandler(fileStore)
-	fileHandler.RegisterRoutes(apiRouter, middleware.AuthMiddleware())
+fileStore := files.NewStore(s.db)
+fileHandler := files.NewHandler(fileStore)
+fileHandler.RegisterRoutes(apiRouter, middleware.AuthMiddleware(userStore))
 
 	// Serve static files (fallback for frontend)
 	router.PathPrefix("/").Handler(http.FileServer(http.Dir("static")))

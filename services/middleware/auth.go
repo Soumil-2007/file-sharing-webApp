@@ -2,21 +2,16 @@ package middleware
 
 import (
 	"net/http"
+	"github.com/gorilla/mux"
+	"github.com/Soumil-2007/file-sharing-webApp/services/auth"
+	"github.com/Soumil-2007/file-sharing-webApp/types"
 )
 
 // AuthMiddleware returns a mux.MiddlewareFunc
-func AuthMiddleware() func(http.Handler) http.Handler {
+func AuthMiddleware(userStore types.UserStore) mux.MiddlewareFunc {
 	return func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			// TODO: validate JWT / session here
-			token := r.Header.Get("Authorization")
-			if token == "" {
-				http.Error(w, "unauthorized", http.StatusUnauthorized)
-				return
-			}
-
-			// If valid → call the next handler
+		return http.HandlerFunc(auth.WithJWTAuth(func(w http.ResponseWriter, r *http.Request) {
 			next.ServeHTTP(w, r)
-		})
+		}, userStore))
 	}
 }

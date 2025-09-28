@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/Soumil-2007/file-sharing-webApp/services/auth"
 	"github.com/google/uuid"
 	"github.com/gorilla/mux"
 )
@@ -177,7 +178,7 @@ func (h *Handler) ListFiles(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) GetFile(w http.ResponseWriter, r *http.Request) {
 	// 🔹 TEMPORARY: hardcoded user id until auth is ready
-	userID := 1
+	userID := auth.GetUserIDFromContext(r.Context())
 
 	vars := mux.Vars(r)
 	id := vars["id"]
