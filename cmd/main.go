@@ -5,8 +5,9 @@ import(
 	"fmt"
 	"log"
 	"github.com/go-sql-driver/mysql"
-	"https://github.com/Soumil-2007/file-sharing-webApp/tree/main/cmd/api"
-	"https://github.com/Soumil-2007/file-sharing-webApp/configs"
+	"github.com/Soumil-2007/file-sharing-webApp/cmd/api"
+	"github.com/Soumil-2007/file-sharing-webApp/configs"
+	"github.com/Soumil-2007/file-sharing-webApp/db"
 )
 
 func main() {
