@@ -100,3 +100,4 @@ func GetUserIDFromContext(ctx context.Context) int {
 
 	return userID
 }
+
